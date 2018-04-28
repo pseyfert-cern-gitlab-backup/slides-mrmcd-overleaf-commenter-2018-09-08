@@ -21,7 +21,7 @@ if WorldPublic:
     out = check_output(["curl",
                         "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
                         "-X", "POST",
-                        "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=20"
+                        "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
                         ])
     # these fail upon try-again due to failure
     check_output(["mv", "LICENSE.pub.md", "LICENSE.md"])
@@ -30,7 +30,7 @@ else:
     out = check_output(["curl",
                         "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
                         "-X", "POST",
-                        "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=0"
+                        "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
                         ])
     # these fail upon try-again due to failure
     check_output(["mv", "LICENSE.int.md", "LICENSE.md"])
