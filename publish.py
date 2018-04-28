@@ -40,7 +40,7 @@ else:
 check_output(["git", "rm", "logo.png"])
 
 # json call like this not ready for python3
-repo_conf = json.loads(out)
+repo_conf = json.loads(out.decode())
 try:
     repo_conf["name"]
 except:
