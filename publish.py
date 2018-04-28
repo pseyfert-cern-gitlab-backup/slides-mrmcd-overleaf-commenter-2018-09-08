@@ -46,6 +46,13 @@ try:
 except:
     # likely repo already exists (try-again? name collision?)
     print("Oh help us")
+    print(json.dumps(
+        repo_conf,
+        sort_keys=True,
+        indent=2,
+        separators=(',', ': ')
+        ))
+
     sys.exit(1)
 
 try:
