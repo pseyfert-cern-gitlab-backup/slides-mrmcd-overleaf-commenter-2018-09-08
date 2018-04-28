@@ -13,47 +13,70 @@ import os
 import sys
 import json
 from subprocess import check_output
+from subprocess import run
+import subprocess
 
 WorldPublic = True
 TrivialName = os.path.basename(os.getcwd())
 
-if WorldPublic:
-    out = check_output(["curl",
-                        "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
-                        "-X", "POST",
-                        "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
-                        ])
-    # these fail upon try-again due to failure
-    check_output(["mv", "LICENSE.pub.md", "LICENSE.md"])
-    check_output(["rm", "LICENSE.int.md"])
-else:
-    out = check_output(["curl",
-                        "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
-                        "-X", "POST",
-                        "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
-                        ])
-    # these fail upon try-again due to failure
-    check_output(["mv", "LICENSE.int.md", "LICENSE.md"])
-    check_output(["rm", "LICENSE.pub.md"])
-    print("TODO share with LHCb")
+
+def create_repo():
+    """ create_repo
+
+    Returns:
+        dictionary (json decoded) server response
+    """
+    if WorldPublic:
+        out = run(["curl",
+                   "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
+                   "-X", "POST",
+                   "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
+                   ],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE
+                  )
+        # these fail upon try-again due to failure
+        check_output(["mv", "LICENSE.pub.md", "LICENSE.md"])
+        check_output(["rm", "LICENSE.int.md"])
+    else:
+        out = run(["curl",
+                   "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
+                   "-X", "POST",
+                   "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
+                   ],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE
+                  )
+        # these fail upon try-again due to failure
+        check_output(["mv", "LICENSE.int.md", "LICENSE.md"])
+        check_output(["rm", "LICENSE.pub.md"])
+        print("TODO share with LHCb")
+
+    print('stderr was {}'.format(out.stderr))
+    repo_conf = json.loads(out.stdout.decode())
+    try:
+        repo_conf["name"]
+    except:
+        # likely repo already exists (try-again? name collision?)
+        print("Oh help us")
+        print(json.dumps(
+            repo_conf,
+            sort_keys=True,
+            indent=2,
+            separators=(',', ': ')
+            ))
+
+        sys.exit(1)
+    return repo_conf
+
+
+repo_conf = create_repo()
 
 check_output(["git", "rm", "logo.png"])
 
 # json call like this not ready for python3
-repo_conf = json.loads(out.decode())
-try:
-    repo_conf["name"]
-except:
-    # likely repo already exists (try-again? name collision?)
-    print("Oh help us")
-    print(json.dumps(
-        repo_conf,
-        sort_keys=True,
-        indent=2,
-        separators=(',', ': ')
-        ))
-
-    sys.exit(1)
 
 try:
     import re
