@@ -17,6 +17,7 @@ import subprocess
 
 WorldPublic = True
 TrivialName = os.path.basename(os.getcwd())
+Token = os.environ["GITLABTOKEN"]
 
 
 def my_run(*args, **kwargs):
@@ -40,7 +41,7 @@ def current_branch_name():
         import git
     except ImportError:
         out = check_output(['git', 'branch'])
-        for b in out.split('\n'):
+        for b in out.decode().split('\n'):
             if b.startswith('* '):
                 return b.replace("* ", "")
     else:
@@ -58,7 +59,7 @@ def create_repo():
     """
     if WorldPublic:
         out = my_run(["curl",
-                      "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
+                      "--header", "PRIVATE-TOKEN: {}".format(Token),
                       "-X", "POST",
                       "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
                       ])
@@ -73,7 +74,7 @@ def create_repo():
                 raise
     else:
         out = my_run(["curl",
-                      "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
+                      "--header", "PRIVATE-TOKEN: {}".format(Token),
                       "-X", "POST",
                       "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
                       ])
@@ -111,7 +112,8 @@ def create_repo():
 
 repo_conf = create_repo()
 
-check_output(["git", "rm", "logo.png"])
+if os.path.isfile("logo.png"):
+    check_output(["git", "rm", "logo.png"])
 
 # json call like this not ready for python3
 
