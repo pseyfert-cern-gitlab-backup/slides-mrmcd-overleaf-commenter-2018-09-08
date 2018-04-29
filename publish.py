@@ -10,6 +10,7 @@
 # WISH: symlinking and submodule handling for main repo
 
 import os
+import re
 import sys
 import json
 from subprocess import check_output
@@ -41,7 +42,7 @@ def current_branch_name():
         import git
     except ImportError:
         out = check_output(['git', 'branch'])
-        for b in out.decode().split('\n'):
+        for b in out.decode().split('\n')[:-1]:
             if b.startswith('* '):
                 return b.replace("* ", "")
     else:
@@ -117,16 +118,27 @@ if os.path.isfile("logo.png"):
 
 # json call like this not ready for python3
 
+desired_push_url = re.sub("7999", "8443", re.sub('ssh://git', 'https://:', repo_conf["ssh_url_to_repo"]))
 try:
-    import re
     # check_output(["git","remote","add",TrivialName,re.sub("7999","8443",re.sub('ssh://git','https://:',repo_conf["ssh_url_to_repo"]))])
     check_output(["git", "remote", "add",
                   "gitlab",
-                  re.sub("7999", "8443", re.sub('ssh://git', 'https://:', repo_conf["ssh_url_to_repo"]))
+                  desired_push_url
                   ])
 except:
     print("couldn't add remote")
-    print(json.dumps(repo_conf, sort_keys=True, indent=2, separators=(',', ': ')))
+    remote_lines = check_output(['git', 'remote', '-v']).decode().split('\n')[:-1]
+    for remote_line in remote_lines:
+        if remote_line.endswith(' (push)'):
+            current_remote = remote_line.replace(" (push)", "").split("\t")
+            if current_remote[0] == 'gitlab':
+                if current_remote[1] == desired_push_url:
+                    pass
+                else:
+                    print('remote gitlab already exists with "wrong" url')
+                    print('wanted {}\n got {}'.format(desired_push_url, current_remote[1]))
+                    print(json.dumps(repo_conf, sort_keys=True, indent=2, separators=(',', ': ')))
+                    raise
 
 # check_output(["git","subtree","split","--prefix="+os.path.basename(DirName),"-b",BranchName])
 try:
@@ -145,7 +157,7 @@ except:
     print("alpha channel removal did ", convert)
 
 with open("./header.tex", "a") as header:
-    header.write('\\newcommand{{\gitlablink}}{{\myhref{{{realurl}}}{{{escapedurl}}}}}\n'.format(realurl=repo_conf['web_url'],escapedurl=repo_conf['web_url'].replace("_",r'\_')))
+    header.write('\\newcommand{{\gitlablink}}{{\myhref{{{realurl}}}{{{escapedurl}}}}}\n'.format(realurl=repo_conf['web_url'], escapedurl=repo_conf['web_url'].replace("_", r'\_')))
 
 # publication script
 # Copyright (C) 2017  Paul Seyfert <pseyfert@cern.ch>
