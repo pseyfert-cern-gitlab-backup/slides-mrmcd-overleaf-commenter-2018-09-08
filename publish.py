@@ -59,40 +59,14 @@ def create_repo():
         dictionary (json decoded) server response
     """
     if WorldPublic:
-        out = my_run(["curl",
-                      "--header", "PRIVATE-TOKEN: {}".format(Token),
-                      "-X", "POST",
-                      "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
-                      ])
-        try:
-            my_run(["mv", "LICENSE.pub.md", "LICENSE.md"])
-            my_run(["rm", "LICENSE.int.md"])
-        except subprocess.CalledProcessError:
-            import os
-            if os.path.isfile("LICENSE.md"):
-                print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
-            else:
-                raise
+        visibility = "public"
     else:
-        out = my_run(["curl",
-                      "--header", "PRIVATE-TOKEN: {}".format(Token),
-                      "-X", "POST",
-                      "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
-                      ])
-        # these fail upon try-again due to failure
-
-        try:
-            my_run(["mv", "LICENSE.int.md", "LICENSE.md"])
-            my_run(["rm", "LICENSE.pub.md"])
-        except subprocess.CalledProcessError:
-            import os
-            if os.path.isfile("LICENSE.md"):
-                print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
-            else:
-                raise
-        print("TODO share with LHCb")
-
-    print('stderr was {}'.format(out.stderr))
+        visibility = "private"
+    out = my_run(["curl",
+                  "--header", "PRIVATE-TOKEN: {}".format(Token),
+                  "-X", "POST",
+                  "https://gitlab.cern.ch/api/v4/projects?name={name}&visibility={visibility}".format(visibility=visibility, name=TrivialName)
+                  ])
     repo_conf = json.loads(out.stdout.decode())
     try:
         repo_conf["name"]
@@ -108,56 +82,93 @@ def create_repo():
             ))
 
         sys.exit(1)
+        my_run(["curl",
+                "--header", "PRIVATE-TOKEN: {}".format(Token),
+                "-X", "POST",
+                "https://gitlab.cern.ch/api/v4/projects/{}/share?group_id=120&group_access=20".format(repo_conf["id"])
+                ])
+        print("TODO share with LHCb")
+
+    if WorldPublic:
+        try:
+            my_run(["git", "mv", "LICENSE.pub.md", "LICENSE.md"])
+            my_run(["git", "rm", "LICENSE.int.md"])
+        except subprocess.CalledProcessError:
+            import os
+            if os.path.isfile("LICENSE.md"):
+                print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
+            else:
+                raise
+    else:
+        try:
+            my_run(["git", "mv", "LICENSE.int.md", "LICENSE.md"])
+            my_run(["git", "rm", "LICENSE.pub.md"])
+        except subprocess.CalledProcessError:
+            import os
+            if os.path.isfile("LICENSE.md"):
+                print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
+            else:
+                raise
+
+    if os.path.isfile("logo.png"):
+        check_output(["git", "rm", "logo.png"])
+
+    with open("./header.tex", "a") as header:
+        header.write('\\newcommand{{\gitlablink}}{{\myhref{{{realurl}}}{{{escapedurl}}}}}\n'.format(realurl=repo_conf['web_url'], escapedurl=repo_conf['web_url'].replace("_", r'\_')))
+
     return repo_conf
 
 
+def add_remote(desired_push_url):
+    try:
+        check_output(["git", "remote", "add",
+                      "gitlab",
+                      desired_push_url
+                      ])
+    except:
+        print("couldn't add remote")
+        remote_lines = check_output(['git', 'remote', '-v']).decode().split('\n')[:-1]
+        for remote_line in remote_lines:
+            if remote_line.endswith(' (push)'):
+                current_remote = remote_line.replace(" (push)", "").split("\t")
+                if current_remote[0] == 'gitlab':
+                    if current_remote[1] == desired_push_url:
+                        print("because it already exists with the right url")
+                        pass
+                    else:
+                        print('remote gitlab already exists with "wrong" url')
+                        print('wanted {}\n got {}'.format(desired_push_url, current_remote[1]))
+                        print(json.dumps(repo_conf, sort_keys=True, indent=2, separators=(',', ': ')))
+                        raise
+
+
+def push():
+    try:
+        pushout = check_output(["git", "push", "--set-upstream", "gitlab", "{}:master".format(current_branch_name())])
+    except:
+        # pushout unknown ...
+        print("push did ", pushout)
+
+
+def qrgen():
+    try:
+        qrgen_output = check_output(["qrencode", "-o", "QR.png", repo_conf['web_url']])
+    except:
+        print("QR code generation did ", qrgen_output)
+    try:
+        convert = check_output(["convert", "QR.png", "-flatten", "QR2.png"])
+    except:
+        print("alpha channel removal did ", convert)
+
+    check_output(["git", "add", "QR.png", "QR2.png"])
+
+
 repo_conf = create_repo()
-
-if os.path.isfile("logo.png"):
-    check_output(["git", "rm", "logo.png"])
-
-# json call like this not ready for python3
-
 desired_push_url = re.sub("7999", "8443", re.sub('ssh://git', 'https://:', repo_conf["ssh_url_to_repo"]))
-try:
-    # check_output(["git","remote","add",TrivialName,re.sub("7999","8443",re.sub('ssh://git','https://:',repo_conf["ssh_url_to_repo"]))])
-    check_output(["git", "remote", "add",
-                  "gitlab",
-                  desired_push_url
-                  ])
-except:
-    print("couldn't add remote")
-    remote_lines = check_output(['git', 'remote', '-v']).decode().split('\n')[:-1]
-    for remote_line in remote_lines:
-        if remote_line.endswith(' (push)'):
-            current_remote = remote_line.replace(" (push)", "").split("\t")
-            if current_remote[0] == 'gitlab':
-                if current_remote[1] == desired_push_url:
-                    pass
-                else:
-                    print('remote gitlab already exists with "wrong" url')
-                    print('wanted {}\n got {}'.format(desired_push_url, current_remote[1]))
-                    print(json.dumps(repo_conf, sort_keys=True, indent=2, separators=(',', ': ')))
-                    raise
+add_remote(desired_push_url)
+qrgen()
+push()
 
-# check_output(["git","subtree","split","--prefix="+os.path.basename(DirName),"-b",BranchName])
-try:
-    pushout = check_output(["git", "push", "--set-upstream", "gitlab", "{}:master".format(current_branch_name())])
-except:
-    # pushout unknown ...
-    print("push did ", pushout)
-
-try:
-    qrgen = check_output(["qrencode", "-o", "QR.png", repo_conf['web_url']])
-except:
-    print("QR code generation did ", qrgen)
-try:
-    convert = check_output(["convert", "QR.png", "-flatten", "QR2.png"])
-except:
-    print("alpha channel removal did ", convert)
-
-with open("./header.tex", "a") as header:
-    header.write('\\newcommand{{\gitlablink}}{{\myhref{{{realurl}}}{{{escapedurl}}}}}\n'.format(realurl=repo_conf['web_url'], escapedurl=repo_conf['web_url'].replace("_", r'\_')))
 
 # publication script
 # Copyright (C) 2017  Paul Seyfert <pseyfert@cern.ch>
