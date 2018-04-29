@@ -13,45 +13,81 @@ import os
 import sys
 import json
 from subprocess import check_output
-from subprocess import run
 import subprocess
 
 WorldPublic = True
 TrivialName = os.path.basename(os.getcwd())
 
 
+def my_run(*args, **kwargs):
+    from subprocess import run
+    out = run(*args,
+              check=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              **kwargs
+              )
+    return out
+
+
+def current_branch_name():
+    """current_branch_name
+
+    Returns:
+        string:   name of the current branch
+    """
+    try:
+        import git
+    except ImportError:
+        out = check_output(['git', 'branch'])
+        for b in out.split('\n'):
+            if b.startswith('* '):
+                return b.replace("* ", "")
+    else:
+        myrepo = git.repo.base.Repo(path=".")
+        return myrepo.active_branch.name
+
+
 def create_repo():
     """ create_repo
+    Creates a repository on the CERN gitlab server. The repository name will be
+    the current directory's name.
 
     Returns:
         dictionary (json decoded) server response
     """
     if WorldPublic:
-        out = run(["curl",
-                   "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
-                   "-X", "POST",
-                   "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
-                   ],
-                  check=True,
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.PIPE
-                  )
-        # these fail upon try-again due to failure
-        check_output(["mv", "LICENSE.pub.md", "LICENSE.md"])
-        check_output(["rm", "LICENSE.int.md"])
+        out = my_run(["curl",
+                      "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
+                      "-X", "POST",
+                      "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=public"
+                      ])
+        try:
+            my_run(["mv", "LICENSE.pub.md", "LICENSE.md"])
+            my_run(["rm", "LICENSE.int.md"])
+        except subprocess.CalledProcessError:
+            import os
+            if os.path.isfile("LICENSE.md"):
+                print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
+            else:
+                raise
     else:
-        out = run(["curl",
-                   "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
-                   "-X", "POST",
-                   "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
-                   ],
-                  check=True,
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.PIPE
-                  )
+        out = my_run(["curl",
+                      "--header", "PRIVATE-TOKEN: "+os.environ["GITLABTOKEN"],
+                      "-X", "POST",
+                      "https://gitlab.cern.ch/api/v4/projects?name="+TrivialName+"&visibility=private"
+                      ])
         # these fail upon try-again due to failure
-        check_output(["mv", "LICENSE.int.md", "LICENSE.md"])
-        check_output(["rm", "LICENSE.pub.md"])
+
+        try:
+            my_run(["mv", "LICENSE.int.md", "LICENSE.md"])
+            my_run(["rm", "LICENSE.pub.md"])
+        except subprocess.CalledProcessError:
+            import os
+            if os.path.isfile("LICENSE.md"):
+                print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
+            else:
+                raise
         print("TODO share with LHCb")
 
     print('stderr was {}'.format(out.stderr))
@@ -60,7 +96,8 @@ def create_repo():
         repo_conf["name"]
     except:
         # likely repo already exists (try-again? name collision?)
-        print("Oh help us")
+        print("Could not create remote repository.")
+        print("Server response is:")
         print(json.dumps(
             repo_conf,
             sort_keys=True,
@@ -91,8 +128,7 @@ except:
 
 # check_output(["git","subtree","split","--prefix="+os.path.basename(DirName),"-b",BranchName])
 try:
-    # check that we are on the master branch
-    pushout = check_output(["git", "push", "gitlab", "master:master"])
+    pushout = check_output(["git", "push", "--set-upstream", "gitlab", "{}:master".format(current_branch_name())])
 except:
     # pushout unknown ...
     print("push did ", pushout)
@@ -105,11 +141,9 @@ try:
     convert = check_output(["convert", "QR.png", "-flatten", "QR2.png"])
 except:
     print("alpha channel removal did ", convert)
-print(" ========================================= ")
-print(" =========   BIG FAT WARNING   =========== ")
-print(" ========================================= ")
-print(" need to add " + repo_conf['web_url'] + " to the tex")
-print(" ========================================= ")
+
+with open("./header.tex", "a") as header:
+    header.write('\\newcommand{{\gitlablink}}{{\myhref{{{realurl}}}{{{escapedurl}}}}}\n'.format(realurl=repo_conf['web_url'],escapedurl=repo_conf['web_url'].replace("_",r'\_')))
 
 # publication script
 # Copyright (C) 2017  Paul Seyfert <pseyfert@cern.ch>
