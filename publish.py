@@ -18,6 +18,7 @@ import subprocess
 
 WorldPublic = True
 TrivialName = os.path.basename(os.getcwd())
+print("repo will basically be named {}".format(TrivialName))
 Token = os.environ["GITLABTOKEN"]
 
 
@@ -149,7 +150,7 @@ def push():
     except:
         # pushout unknown ...
         try:
-        print("push did ", pushout)
+            print("push did ", pushout)
         except:
             print("push failed")
             print("origin is set up and stuff, just fix the push error")
