@@ -153,6 +153,7 @@ def push():
             print("push did ", pushout)
         except:
             print("push failed")
+            print("command was: git push --set-upstream gitlab {}:master".format(current_branch_name()))
             print("origin is set up and stuff, just fix the push error")
             print("maybe authenticate")
 

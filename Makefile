@@ -7,7 +7,7 @@ all:
 quick:
 	xelatex pseyfert.tex
 clean:
-	rm -rf pseyfert.aux pseyfert.log pseyfert.nav pseyfert.out pseyfert.snm pseyfert.toc
+	rm -rf pseyfert.aux pseyfert.log pseyfert.nav pseyfert.out pseyfert.snm pseyfert.toc pseyfert.vrb
 
 printviews:
 	pdfnup --nup '2x2' pseyfert.pdf
