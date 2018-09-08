@@ -58,6 +58,7 @@ def create_repo():
     Returns:
         dictionary (json decoded) server response
     """
+    import os
     if WorldPublic:
         visibility = "public"
     else:
@@ -91,20 +92,20 @@ def create_repo():
 
     if WorldPublic:
         try:
+            my_run(["git", "rm", "LICENSE.md"])
             my_run(["git", "mv", "LICENSE.pub.md", "LICENSE.md"])
             my_run(["git", "rm", "LICENSE.int.md"])
         except subprocess.CalledProcessError:
-            import os
             if os.path.isfile("LICENSE.md"):
                 print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
             else:
                 raise
     else:
         try:
+            my_run(["git", "rm", "LICENSE.md"])
             my_run(["git", "mv", "LICENSE.int.md", "LICENSE.md"])
             my_run(["git", "rm", "LICENSE.pub.md"])
         except subprocess.CalledProcessError:
-            import os
             if os.path.isfile("LICENSE.md"):
                 print("could not replace LICENSE.md by LICENSE.int.md. Assume this has already been done.")
             else:
@@ -147,7 +148,12 @@ def push():
         pushout = check_output(["git", "push", "--set-upstream", "gitlab", "{}:master".format(current_branch_name())])
     except:
         # pushout unknown ...
+        try:
         print("push did ", pushout)
+        except:
+            print("push failed")
+            print("origin is set up and stuff, just fix the push error")
+            print("maybe authenticate")
 
 
 def qrgen():
